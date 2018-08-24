@@ -1,126 +1,149 @@
 #!/usr/bin/env python3
 import yaml
-import glob
+from glob import glob
 from os import system
 from sys import exit as sys_exit
 from clint.textui import prompt, puts, colored, indent, columns
 from clint.textui.cols import _find_unix_console_width
+from transitions.extensions import HierarchicalMachine as Machine
 
-# Globals
-WIDTH = _find_unix_console_width()
-LB = ''.center(WIDTH,'=')
-HEADER = LB+'\n'+colored.red('Recipes'.center(WIDTH))+'\n'+LB+'\n'
+class RecipeViewer(object):
+    # Globals
+    states = ['main_menu',{'name':'recipe', 'children':['overview','directions','ingredients','editting'], 'initial':'overview'},'quitting','_init']
+    transitions = [
+            { 'trigger':'view_recipe', 'source':['main_menu','recipe'], 'dest':'recipe', 'after':'show_recipe' },
+            { 'trigger':'view_menu', 'source':'recipe', 'dest':'main_menu', 'after':'show_menu' },
+            { 'trigger':'view_ingredients', 'source':'recipe', 'dest':'recipe_ingredients', 'after':'show_ingredients' },
+            { 'trigger':'view_directions', 'source':'recipe', 'dest':'recipe_directions', 'after':'show_directions' },
+            { 'trigger':'edit', 'source':'recipe', 'dest':'recipe_editting', 'after':'edit_menu' },
+            { 'trigger':'quit', 'source':'*', 'dest':'quitting', 'after':'exit', 'before':'clear' },
+            { 'trigger':'start', 'source':'_init', 'dest':'main_menu', 'after':'show_menu'}
+    ]
+    NARROW = 60
 
-def clear():
-    _ = system('clear') # This isn't portable, but works for me
-    return
+    def __init__(self):
+        self.machine = Machine(model=self, states=RecipeViewer.states, transitions=self.transitions, initial='_init', auto_transitions=False)
+        self.WIDTH = _find_unix_console_width()
+        self.LB = ''.center(self.WIDTH,'=')
+        self.file = ''
+        self.prompt = ''
+        self.options = []
+        self.start()
+        self.RECIPE_OPTIONS = [{'selector': 'I','prompt':'Ingredients','return':self.view_ingredients},
+               {'selector': 'D','prompt':'Directions','return':self.view_directions},
+               {'selector': 'V','prompt':'Return to Recipe Overview','return':self.view_recipe},
+               {'selector': 'E','prompt':'Edit Recipe','return':self.edit},
+               {'selector': 'R','prompt':'Return to Main Menu','return':self.view_menu},
+               {'selector': 'Q','prompt':'Quit','return':self.quit}]
 
-def wait():
-    _ = system('read -s -n 1') # Again not portable
-    return
+    def clear(self, *args):
+        _ = system('clear') # This isn't portable, but works for me
+        return
 
-def exit(*args):
-    sys_exit()
+    def wait(self):
+        _ = system('read -s -n 1') # Again not portable
+        return
 
-def header(text):
-    puts(LB)
-    puts(colored.red(text.center(WIDTH)))
-    puts(LB)
-    puts()
-    return
+    def exit(*args):
+        sys_exit()
 
-def main_menu(*args):
-    files = glob.glob('*.yaml')
-    names = [' '.join([s.title() for s in f.split('.')[0].split('_')]) for f in files]
-    main_options = []
-    for key, opt in enumerate(names):
-        main_options.append({'selector':key+1,'prompt':opt,'return':key})
-    main_options.append({'selector':'Q','prompt':'Quit'})
+    def header(self, text):
+        puts(self.LB)
+        puts(colored.red(text.center(self.WIDTH)))
+        puts(self.LB)
+        puts()
+        return
 
-    clear()
-    header('Recipes')
-    r = prompt.options('Choose a recipe:', main_options)
-    if r == 'Q':
-        exit()
-    else:
-        view(files[r])
+    def show_menu(self):
+        self.header_text = 'Recipes'
+        self.text = ''
+        
+        files = glob('*.yaml')
+        names = [' '.join([s.title() for s in f.split('.')[0].split('_')]) for f in files]
+        self.options = []
+        for key, opt in enumerate(names):
+            self.options.append({'selector':key+1,'prompt':opt,'return':lambda bound_file=files[key]: self.view_recipe(bound_file)})
+        self.options.append({'selector':'Q','prompt':'Quit','return':quit})
+        self.prompt = 'Choose a recipe'
 
-def view(data):
-    if isinstance(data,str):
-        file_name = data
-        with open(file_name,'r') as fp:
-            data = yaml.load(fp)
+        return
 
-    clear()
-    header(data['Title'])
-    puts('Tags')
-    with indent(4, quote=' >'):
-        for t in data['Tags']:
-            puts(t)
-    r = list_options(view)
-    r(data)
+    def show_recipe(self, file_name=''):
+        if file_name!='':
+            with open(file_name,'r') as fp:
+                self.data = yaml.load(fp)
+        self.header_text = self.data['Title']
 
-def list_options(current):
-    puts()
-    current_opts = [opt for opt in OPTIONS if opt['return'] != current]
-    r = prompt.options('View:',current_opts)
-    return r
+        tags_text = 'Tags:\n'
+        for tag in self.data['Tags']:
+            tags_text += ' > ' + str(tag) + '\n'
 
-def ingredients(data):
-    clear()
-    header(data['Title'])
-    puts('Ingredients')
-    with indent(4, quote=' >'):
-        max_ingr = max([len(ingr) for ingr, quan in data['Ingredients'].items()]) + 1
-        for ingr, quan in data['Ingredients'].items():
-            puts(ingr.ljust(max_ingr) + ": " + str(quan))
-    r = list_options(ingredients)
-    r(data)
-    return
+        notes_text = 'Notes:\n'
+        for note in self.data['Notes']:
+            notes_text += ' > ' + str(note) + '\n'
 
-def directions(data):
-    clear()
-    header(data['Title'])
-    puts('Directions')
-    
-    # Print the list of ingredients anyways
-    ingr_str = ''
-    max_ingr = max([len(ingr) for ingr, quan in data['Ingredients'].items()]) + 1
-    max_quan = max([len(str(quan)) for ingr, quan in data['Ingredients'].items()]) + 5
-    for ingr, quan in data['Ingredients'].items():
-        ingr_str += ingr.ljust(max_ingr) + ": " + str(quan) + '\n'
+        self.text = tags_text + '\n' + notes_text
+        self.options = [opt for opt in self.RECIPE_OPTIONS if opt['return'] != self.view_recipe]
+        self.prompt = 'View: '
+        return
 
-    dir_str = ''
-    for step, action in data['Directions'].items():
-        dir_str += str(step) + ": " + action + '\n'
+    def show_ingredients(self):
+        self.text = self.get_ingr_text()
+        self.options = [opt for opt in self.RECIPE_OPTIONS if opt['return'] != self.view_ingredients]
+        return
 
-    if WIDTH >= max_ingr+max_quan+40:
-        puts(columns([ingr_str, max_ingr + max_quan],[dir_str, WIDTH - max_ingr - max_quan - 5])) # this somehow strips the ljust
-    else:
-        puts(ingr_str)
-        puts(dir_str)
-    wait()
-    r = list_options(directions)
-    r(data)
-    return
+    def get_ingr_text(self):
+        text = 'Ingredients:\n'
+        max_ingr = max([len(ingr) for ingr, quan in self.data['Ingredients'].items()]) + 1
+        for ingr, quan in self.data['Ingredients'].items():
+            text += ' > ' + (ingr.ljust(max_ingr) + ": " + str(quan)) + '\n'
+        return text
 
-def notes(data):
-    clear()
-    header(data['Title'])
-    puts('Notes')
-    with indent(4, quote=' >'):
-        for note in data['Notes']:
-            puts(note)
-    r = list_options(notes)
-    r(data)
-    return
+    def show_directions(self):
+        peek = lambda x: (lambda v=x.pop(): (lambda t=x.append(v): v)() )() # this is the dumbest line of code I've ever written
+        ingr_text = self.get_ingr_text()
+        ingr_width = max([len(s) for s in ingr_text.split('\n')]) + 3
+        dir_text = 'Directions:\n'
+        if self.WIDTH>self.NARROW:
+            dir_width = self.WIDTH - ingr_width - 3
+            for step, action in self.data['Directions'].items():
+                action = str(action).split()
+                action.reverse()
+                line = ' ' + str(step) + ': '
+                while action:
+                    while action and len(line+peek(action)) < dir_width:
+                        line += action.pop() + ' '
+                    dir_text += line + '\n'
+                    line = '' 
 
-OPTIONS = [{'selector': 'I','prompt':'Ingredients','return':ingredients},
-           {'selector': 'D','prompt':'Directions','return':directions},
-           {'selector': 'N','prompt':'Notes','return':notes},
-           {'selector': 'V','prompt':'Return to Recipe Overview','return':view},
-           {'selector': 'R','prompt':'Return to Main Menu','return':main_menu},
-           {'selector': 'Q','prompt':'Quit','return':exit}]
+            self.text = ''
+            ingr_text = ingr_text.split('\n')
+            dir_text = dir_text.split('\n')
+            len_diff = len(ingr_text) - len(dir_text)
+            if len_diff > 0:
+                dir_text.extend(['']*len_diff)
+            if len_diff < 0:
+                ingr_text.extend(['']*abs(len_diff))
+            for i in range(0,len(ingr_text)):
+                self.text += ingr_text[i].ljust(ingr_width) + '   ' + dir_text[i] + '\n'
+        else:
+            for step, action in self.data['Directions'].items():
+                dir_text += ' ' + str(step) + ': ' + str(action) + '\n'
+            self.text = ingr_text + '\n' + dir_text
+
+        self.options = [opt for opt in self.RECIPE_OPTIONS if opt['return'] != self.view_directions]
+        return
+
+    def edit_menu(self):
+        self.text = 'Editting not yet implemented.\n'
+        self.options = [opt for opt in self.RECIPE_OPTIONS if opt['return'] != self.edit]
+        return
 
 if __name__ == '__main__':
-    main_menu()
+    rv = RecipeViewer()
+    while (True):
+        rv.clear()
+        rv.header(rv.header_text)
+        puts(rv.text)
+        r = prompt.options(rv.prompt,rv.options)
+        r()
