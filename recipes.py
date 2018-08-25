@@ -6,6 +6,7 @@ from sys import exit as sys_exit
 from clint.textui import prompt, puts, colored, indent, columns
 from clint.textui.cols import _find_unix_console_width
 from transitions.extensions import HierarchicalMachine as Machine
+from collections import OrderedDict
 
 class RecipeViewer(object):
     # Globals
@@ -70,6 +71,7 @@ class RecipeViewer(object):
 
     def show_recipe(self, file_name=''):
         if file_name!='':
+            self.file = file_name
             with open(file_name,'r') as fp:
                 self.data = yaml.load(fp)
         self.header_text = self.data['Title']
@@ -135,15 +137,39 @@ class RecipeViewer(object):
         return
 
     def edit_menu(self):
-        self.text = 'Editting not yet implemented.\n'
-        self.options = [opt for opt in self.RECIPE_OPTIONS if opt['return'] != self.edit]
+        self.text = 'Add a Note\n'
+        self.refresh()
+        note = prompt.query('Note Content:')
+        add = prompt.yn('Save this Note?')
+        if add:
+            self.data['Notes'].append(note)
+            self.data['Ingredients'] = OrderedDict(self.data['Ingredients'])
+            with open(self.file,'w') as fp:
+                yaml.dump(OrderedDict(self.data), fp, default_flow_style=False, indent=4)
+        self.view_recipe()
         return
 
+    def refresh(self):
+        self.clear()
+        self.header(self.header_text)
+        puts(self.text)
+        return
+
+def represent_ordereddict(dumper, data):
+    value = []
+
+    for item_key, item_value in data.items():
+        node_key = dumper.represent_data(item_key)
+        node_value = dumper.represent_data(item_value)
+
+        value.append((node_key, node_value))
+
+    return yaml.nodes.MappingNode(u'tag:yaml.org,2002:map', value)
+
 if __name__ == '__main__':
+    yaml.add_representer(OrderedDict, represent_ordereddict)
     rv = RecipeViewer()
     while (True):
-        rv.clear()
-        rv.header(rv.header_text)
-        puts(rv.text)
+        rv.refresh()
         r = prompt.options(rv.prompt,rv.options)
         r()
