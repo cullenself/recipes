@@ -8,6 +8,7 @@ from clint.textui.cols import _find_unix_console_width
 from transitions.extensions import HierarchicalMachine as Machine
 from transitions.core import MachineError
 from collections import OrderedDict
+from ftplib import FTP
 import urwid
 
 class RecipeViewer(object):
@@ -22,9 +23,11 @@ class RecipeViewer(object):
             { 'trigger':'view_directions', 'source':'recipe', 'dest':'recipe_directions', 'after':'show_directions' },
             { 'trigger':'edit', 'source':'recipe', 'dest':'recipe_editting', 'after':'edit_menu' },
             { 'trigger':'quit', 'source':'*', 'dest':'quitting', 'after':'exit', 'before':'clear' },
-            { 'trigger':'start', 'source':'_init', 'dest':'main_menu', 'after':'build_menu'}
+            { 'trigger':'start', 'source':'_init', 'dest':'main_menu', 'after':'build_menu'},
+            { 'trigger':'print_recipe', 'source':'recipe', 'dest':'=', 'after':'print_file'},
     ]
     NARROW = 60
+    PRINTER = '192.168.0.18'
 
     def __init__(self):
         self.machine = Machine(model=self, states=RecipeViewer.states, transitions=self.transitions, initial='_init', auto_transitions=False)
@@ -57,6 +60,12 @@ class RecipeViewer(object):
         if key in ('e','E'):
             try:
                 self.edit()
+                return True
+            except MachineError:
+                return False
+        if key in ('p','P'):
+            try:
+                self.print_recipe()
                 return True
             except MachineError:
                 return False
@@ -117,6 +126,13 @@ class RecipeViewer(object):
         notes_list = urwid.ListBox(urwid.SimpleListWalker(notes))
 
         self.main.original_widget = urwid.Columns([tags_list,notes_list])
+        return
+
+    def print_file(self):
+        with FTP(self.PRINTER) as ftp:
+            ftp.login()
+            with open(self.file,'rb') as fp:
+                ftp.storlines('STOR recipe.yaml', fp)
         return
 
     def show_ingredients(self):

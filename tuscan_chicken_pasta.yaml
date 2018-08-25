@@ -1,14 +1,12 @@
-%YAML 1.2
----
-Title: Tuscan Chicken Pasta 
+Title: Tuscan Chicken Pasta
 Catagory: Dinner
 Tags:
-    - Pasta
-    - Chicken
+- Pasta
+- Chicken
 Servings: 4
 Ingredients:
     Pasta: 12 oz
-    Olive Oil: 1 Tablespoon 
+    Olive Oil: 1 Tablespoon
     Chicken Breast: 1 lb
     Pancetta: 1/4 lb
     Garlic, Diced: 2 cloves
@@ -18,12 +16,13 @@ Ingredients:
     Parmesan: 1/3 cup
     Basil: Garnish
 Directions:
-    1: Cook pasta in heavily salted water, reserved 1 cup pasta water after draining.
-    2: Heat oil, cook chicken through, slice into strips
-    3: Cook Pancetta, remove
-    4: Saute garlic, tomatoes, spinach, then add cream, parmesan, pasta water and simmer
-    5: Add pasta, chicken, pancetta, garnish with basil
+    1: Cook pasta in heavily salted water, reserved 1 cup pasta water after
+        draining.
+    2: Heat oil, cook chicken through, slice into strips.
+    3: Cook Pancetta, remove.
+    4: Saute garlic, tomatoes, spinach, then add cream, parmesan, pasta water
+        and simmer.
+    5: Add pasta, chicken, pancetta, garnish with basil.
 Notes:
-    - Don't over cook pancetta
-    - Season chicken
-...
+- Don't over cook pancetta
+- Season chicken

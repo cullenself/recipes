@@ -6,6 +6,6 @@
     - [ ] clean up edit page, make 'enter' save
 - [ ] readme and other code cleanup
 - [x] Transition to state machine to clean up call stack
-- [ ] Ingredient quantity modification
-- [ ] Print Directions
+- [ ] Ingredient quantity modification and serving size
+- [x] Print Directions
 - [ ] Context sensitive footer
